@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A* - Rota de Cidades</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            height: 90vh;
+        }
+
+        @media (max-width: 992px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 60vh 1fr; /* Fixa o mapa em 60% e o resto para a sidebar */
+                height: 100vh;
+                border-radius: 0;
+            }
+            #map {
+                height: 100%; /* Ocupa os 60vh definidos no grid-template-rows */
+            }
+            .sidebar {
+                border-left: none;
+                border-top: 1px solid #e9ecef;
+                overflow-y: auto; /* Permite rolar a sidebar sem sumir com o mapa */
+            }
+            body {
+                padding: 0;
+            }
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 1px solid #e9ecef;
+        }
+
+        .sidebar h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            margin-bottom: 10px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .info-box {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .info-box h3 {
+            font-size: 12px;
+            color: #667eea;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .cities-list {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .cities-list div {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f3f5;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .cities-list div.active {
+            background: #e7f0ff;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .legend {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #e9ecef;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+
+        <div class="sidebar">
+            <h2>Algoritmo A*</h2>
+
+            <div class="control-group">
+                <label>Cidade de Início</label>
+                <select id="startCity"></select>
+                
+                <label>Cidade de Destino</label>
+                <select id="endCity"></select>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="calcularRota()">Calcular Rota</button>
+                <button class="btn-secondary" onclick="limparMapa()">Limpar</button>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item"><div class="legend-color" style="background: #4CAF50;"></div><span>Início</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: #f44336;"></div><span>Destino</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: #2196F3;"></div><span>Cidades</span></div>
+            </div>
+
+            <div id="resultado" style="display: none;">
+                <div class="info-box">
+                    <h3>Distância Total</h3>
+                    <p id="distanciaTotal">-</p>
+                </div>
+                <div class="cities-list" id="listaCidades"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        const CIDADES = {
+            "Foz do Iguacu": { lat: -25.5478, lon: -54.5882 },
+            "Cascavel": { lat: -24.9578, lon: -53.4597 },
+            "Guarapuava": { lat: -25.3907, lon: -51.4628 },
+            "Ponta Grossa": { lat: -25.0950, lon: -50.1614 },
+            "Curitiba": { lat: -25.4290, lon: -49.2671 },
+            "Paranagua": { lat: -25.5205, lon: -48.5096 },
+            "Maringa": { lat: -23.4209, lon: -51.9331 },
+            "Pato Branco": { lat: -26.2289, lon: -52.6711 },
+            "Irati": { lat: -25.4673, lon: -50.6511 },
+            "Telemaco Borba": { lat: -24.3239, lon: -50.6156 }
+        };
+
+        let mapa, marcadores = {}, linhas = [];
+
+        function init() {
+            mapa = L.map('map').setView([-25.0, -51.0], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapa);
+
+            const selectInicio = document.getElementById('startCity');
+            const selectFim = document.getElementById('endCity');
+
+            Object.keys(CIDADES).forEach(nome => {
+                marcadores[nome] = L.circleMarker([CIDADES[nome].lat, CIDADES[nome].lon], {
+                    radius: 8, fillColor: "#2196F3", color: "#1976D2", weight: 2, fillOpacity: 0.8
+                }).addTo(mapa).bindPopup(nome);
+
+                selectInicio.add(new Option(nome, nome));
+                selectFim.add(new Option(nome, nome));
+            });
+            selectFim.value = "Paranagua";
+        }
+
+        function calcularDistancia(cidadeA, cidadeB) {
+            const c1 = CIDADES[cidadeA], c2 = CIDADES[cidadeB];
+            const R = 6371;
+            const dLat = (c2.lat - c1.lat) * Math.PI / 180;
+            const dLon = (c2.lon - c1.lon) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(c1.lat * Math.PI / 180) * Math.cos(c2.lat * Math.PI / 180) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // f(n) = g(n) + h(n)
+        function buscaAEstrela(inicio, objetivo) {
+            const todasCidades = Object.keys(CIDADES);
+            const intermediarias = todasCidades.filter(c => c !== inicio && c !== objetivo);
+            
+            let listaAberta = [];
+            let listaFechada = new Set();
+
+            listaAberta.push({
+                cidade: inicio,
+                visitadas: [],
+                g: 0,
+                h: calcularDistancia(inicio, objetivo),
+                f: calcularDistancia(inicio, objetivo),
+                caminho: [inicio]
+            });
+
+            while (listaAberta.length > 0) {
+                listaAberta.sort((a, b) => a.f - b.f);
+                const atual = listaAberta.shift();
+
+                if (atual.cidade === objetivo && atual.visitadas.length === intermediarias.length) {
+                    return atual;
+                }
+
+                const chaveEstado = `${atual.cidade}|${atual.visitadas.sort().join(',')}`;
+                if (listaFechada.has(chaveEstado)) continue;
+                listaFechada.add(chaveEstado);
+
+                const vizinhos = todasCidades.filter(c => !atual.caminho.includes(c) || (c === objetivo && atual.visitadas.length === intermediarias.length));
+
+                for (let proxima of vizinhos) {
+                    const novaG = atual.g + calcularDistancia(atual.cidade, proxima);
+                    const novaH = calcularDistancia(proxima, objetivo);
+                    
+                    listaAberta.push({
+                        cidade: proxima,
+                        visitadas: intermediarias.includes(proxima) ? [...atual.visitadas, proxima] : [...atual.visitadas],
+                        g: novaG,
+                        h: novaH,
+                        f: novaG + novaH,
+                        caminho: [...atual.caminho, proxima]
+                    });
+                }
+            }
+            return null;
+        }
+
+        function calcularRota() {
+            const inicio = document.getElementById('startCity').value;
+            const objetivo = document.getElementById('endCity').value;
+            if (inicio === objetivo) return alert("Início e Destino devem ser diferentes!");
+
+            limparMapa(false);
+            const resultado = buscaAEstrela(inicio, objetivo);
+
+            if (resultado) {
+                desenharCaminho(resultado.caminho);
+                document.getElementById('distanciaTotal').innerText = `${resultado.g.toFixed(2)} km`;
+                const lista = document.getElementById('listaCidades');
+                lista.innerHTML = resultado.caminho.map((c, i) => `<div class="active">${i+1}. ${c}</div>`).join('');
+                document.getElementById('resultado').style.display = 'block';
+            }
+        }
+
+        function desenharCaminho(caminho) {
+            for (let i = 0; i < caminho.length - 1; i++) {
+                const p1 = CIDADES[caminho[i]], p2 = CIDADES[caminho[i+1]];
+                linhas.push(L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], {
+                    color: '#667eea', weight: 4, opacity: 0.8
+                }).addTo(mapa));
+            }
+            marcadores[caminho[0]].setStyle({fillColor: '#4CAF50'});
+            marcadores[caminho[caminho.length-1]].setStyle({fillColor: '#f44336'});
+        }
+
+        function limparMapa(completo = true) {
+            linhas.forEach(l => mapa.removeLayer(l));
+            linhas = [];
+            Object.values(marcadores).forEach(m => m.setStyle({fillColor: "#2196F3"}));
+            if(completo) document.getElementById('resultado').style.display = 'none';
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
